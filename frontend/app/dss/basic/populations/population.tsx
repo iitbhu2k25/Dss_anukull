@@ -3,6 +3,10 @@ import React, { useState, useEffect } from "react"
 
 import TimeMethods from "./components/timeseries";
 import DemographicMethods from "./components/demographic";
+
+import dynamic from "next/dynamic";
+
+const PopulationChart = dynamic(() => import("./components/PopulationChart"), { ssr: false })
 interface Village {
     id: number;
     name: string;
@@ -38,6 +42,7 @@ const Population: React.FC<PopulationProps> = ({
     });
     // Add state for results
     const [results, setResults] = useState<any[] | null>(null);
+    const [selectedMethod, setSelectedMethod] = useState<string>("");
 
     // Update input mode when user interacts with fields
     useEffect(() => {
@@ -143,9 +148,9 @@ const Population: React.FC<PopulationProps> = ({
 
     // Handle form submission - in a real app, you would make an API call here
     const handleSubmit = async () => {
-        console.log('starts')
-        const resp = await fetch('http://localhost:9000/api/basic/time_series/arthemitic/',
-            {
+        try {
+            console.log('starts');
+            const resp = await fetch('http://localhost:9000/api/basic/time_series/arthemitic/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -154,38 +159,54 @@ const Population: React.FC<PopulationProps> = ({
                     "start_year": range_year_start,
                     "end_year": range_year_end,
                     "year": single_year,
-                    "villages_props":villages_props,
-                    "subdistrict_props":subDistricts_props,
-                    "totalPopulation_props":totalPopulation_props                    
+                    "villages_props": villages_props,
+                    "subdistrict_props": subDistricts_props,
+                    "totalPopulation_props": totalPopulation_props                    
                 })
+            });
+    
+            if (!resp.ok) {
+                throw new Error(`HTTP error! Status: ${resp.status}`);
             }
-        );
-        const res = await resp.json();
-        console.log(res);
-
-        // Mock data for demonstration purposes
-        // const mockYears = inputMode === 'single' 
-        //     ? [single_year!] 
-        //     : Array.from({length: (range_year_end! - range_year_start!) + 1}, (_, i) => range_year_start! + i);
-        
-        // const mockResults = mockYears.map(year => {
-        //     // Sample calculation logic (would be replaced by backend response)
-        //     const basePopulation = 1000000;
-        //     const yearsSince2011 = year - 2011;
-        //     const growthRate = 1.5 - (yearsSince2011 * 0.02);
-        //     const population = basePopulation * Math.pow(1 + (growthRate / 100), yearsSince2011);
+    
+            const res = await resp.json();
             
-        //     return {
-        //         year,
-        //         population: Math.round(population),
-        //         growthRate: growthRate.toFixed(2),
-        //         methods: Object.keys(methods).filter(m => methods[m as keyof typeof methods])
-        //     };
-        // });
-        
-        //setResults(mockResults);
-        console.log('endsd')
+            console.log("result ",res);
+            setResults(res); // Store the response in state
+
+              // Determine the default method with the highest total population
+            let maxMethod = "";
+            let maxPopulation = -Infinity;
+
+            Object.keys(res).forEach((method) => {
+                const totalPop = Object.values(res[method]).reduce((sum, val) => sum + val, 0);
+                if (totalPop > maxPopulation) {
+                    maxPopulation = totalPop;
+                    maxMethod = method;
+                }
+            });
+
+            setSelectedMethod(maxMethod);
+        } catch (error) {
+            console.error("Error fetching data:", error);
+        }
     };
+   
+    // Function to extract unique years from all models 
+    const getYears = (data: any) => {
+        if (!data) return [];
+        const allYears = new Set<number>();
+
+        Object.values(data).forEach((model: any) => {
+            Object.keys(model).forEach((year) => {
+                const yearNum = Number(year);
+                 allYears.add(yearNum); // Exclude 2011
+            });
+        });
+
+        return Array.from(allYears).sort((a, b) => a - b);
+    };
+
 
     return (
         <div className="p-4 mt-5 bg-white rounded-lg shadow-md">
@@ -337,53 +358,58 @@ const Population: React.FC<PopulationProps> = ({
             </div>
 
             {/* Results Table */}
-            {results && (
-                <div className="mt-8">
-                    <h2 className="text-lg font-semibold text-gray-700 mb-3">Population Forecasting Results</h2>
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full bg-white border border-gray-200">
-                            <thead>
-                                <tr className="bg-gray-100 border-b">
-                                    <th className="py-2 px-4 text-left border-r">Year</th>
-                                    <th className="py-2 px-4 text-left border-r">Population</th>
-                                    <th className="py-2 px-4 text-left border-r">Growth Rate (%)</th>
-                                    <th className="py-2 px-4 text-left">Methods Used</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {results.map((row, index) => (
-                                    <tr key={index} className="border-b hover:bg-gray-50">
-                                        <td className="py-2 px-4 border-r">{row.year}</td>
-                                        <td className="py-2 px-4 border-r">{row.population.toLocaleString()}</td>
-                                        <td className="py-2 px-4 border-r">{row.growthRate}%</td>
-                                        <td className="py-2 px-4">{row.methods.join(', ')}</td>
-                                    </tr>
+
+          
+            
+             {/* Show Table */}
+             {results && (
+                <div className="mt-6">
+                <h2 className="text-lg font-semibold mb-4">Population Data</h2>
+            
+                {/* Scrollable Table Container */}
+                <div className="table-container overflow-x-auto border border-gray-300 rounded-lg shadow-md">
+                    <table className="w-auto min-w-[500px] bg-white border-collapse table-auto">
+                        <thead className="bg-gray-200">
+                            <tr>
+                                <th className="border px-4 py-2 w-24">Year</th>
+                                {Object.keys(results).map((method) => (
+                                    <th key={method} className="border px-4 py-2">
+                                        <label className="flex items-center gap-2 justify-center">
+                                            <input
+                                                type="radio"
+                                                name="selectedMethod"
+                                                value={method}
+                                                checked={selectedMethod === method}
+                                                onChange={() => setSelectedMethod(method)}
+                                            />
+                                            {method}
+                                        </label>
+                                    </th>
                                 ))}
-                            </tbody>
-                        </table>
-                    </div>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {getYears(results).map((year) => (
+                                <tr key={year} className="border-t">
+                                    <td className="border px-4 py-2 font-semibold">{year}</td>
+                                    {Object.keys(results).map((method) => (
+                                        <td key={`${method}-${year}`} className="border px-4 py-2 text-center">
+                                            {results[method][year] ?? "-"}
+                                        </td>
+                                    ))}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
+            </div>
+            
+            
             )}
 
-            {/* Method Descriptions */}
-            {/* <div className="mt-8">
-                <h2 className="text-lg font-semibold text-gray-700 mb-3">Population Prediction Methods</h2>
-                <div className="bg-white rounded-md shadow-sm p-4 border border-gray-200">
-                    <h3 className="font-medium text-gray-700 mb-2">Method Descriptions</h3>
-                    <ul className="list-disc pl-5 space-y-2 text-gray-600">
-                        <li><span className="font-medium">Time Series:</span> Analyzes historical population data to project future trends.</li>
-                        <li><span className="font-medium">Demographic:</span> Takes into account birth rates, death rates, and migration patterns.</li>
-                        <li><span className="font-medium">Cohort:</span> Tracks groups of individuals born in the same time period as they age.</li>
-                    </ul>
-                </div>
-                
-                <div className="mt-4 bg-white rounded-md shadow-sm p-4 border border-gray-200">
-                    <h3 className="font-medium text-gray-700 mb-2">Growth Calculation</h3>
-                    <p className="text-gray-600">
-                        Population growth is calculated with respect to the base year 2011, showing percentage change over time.
-                    </p>
-                </div>
-            </div> */}
+            {/* Show Chart */}
+            {results && <PopulationChart results={results} />}
+        
         </div>
     )
 }

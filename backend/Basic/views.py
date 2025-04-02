@@ -5,7 +5,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 import math
-from .service import Airthemtic_population_single_year
+from .service import *
 
 class Locations_stateAPI(APIView):
     def get(self,request,format=None):
@@ -48,9 +48,33 @@ class Time_series(APIView):
         subdistrict = request.data['subdistrict_props']
         total_population = request.data['totalPopulation_props']
         
+
+        # Correcting the subdistrict_id of the villages coming from frontend 
+        # Fetch all villages from the database
+        village_data = Basic_village.objects.values('village_code', 'subdistrict_code')
+        # Create a mapping of village_code to subdistrict_code
+        village_mapping = {v['village_code']: v['subdistrict_code'] for v in village_data}
+        # Update the villages list with the correct subDistrictId
+        for village in villages:
+            village_code = village['id']
+            if village_code in village_mapping:
+                village['subDistrictId'] = village_mapping[village_code]
+
+
+
+
         main_output={}
         if single_year:
-            main_output['Airthemitic']=Airthemtic_population_single_year(base_year,single_year,villages,subdistrict)
+            main_output['Arithmetic']=Arithmetic_population_single_year(base_year,single_year,villages,subdistrict)
+            main_output['Geometric']=Geometric_population_single_year(base_year,single_year,villages,subdistrict)
+            main_output['Incremental']=Incremental_population_single_year(base_year,single_year,villages,subdistrict)
+            main_output['Exponential']=Exponential_population_single_year(base_year,single_year,villages,subdistrict)
+
+        elif start_year and end_year:
+            main_output['Arithmetic']=Arithmetic_population_range(base_year,start_year,end_year,villages,subdistrict)  
+            main_output['Geometric']=Geometric_population_range(base_year,start_year,end_year,villages,subdistrict)
+            main_output['Incremental']=Incremental_population_range(base_year,start_year,end_year,villages,subdistrict)
+            main_output['Exponential']=Exponential_population_range(base_year,start_year,end_year,villages,subdistrict)
         else:
             pass
         print("output",main_output)
