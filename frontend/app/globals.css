@@ -1,0 +1,26 @@
+@import "tailwindcss";
+.table-container {
+    width: 100%;
+    overflow-x: auto; /* Enable horizontal scrolling */
+    white-space: nowrap; /* Prevent text wrapping inside table */
+}
+
+.table-container table {
+    width: max-content; /* Make sure the table is only as wide as it needs to be */
+    min-width: 100%; /* Ensure it doesn't shrink too much */
+    border-collapse: collapse; /* Ensure borders look proper */
+}
+
+.table-container th,
+.table-container td {
+    padding: 8px 12px;
+    border: 1px solid #ddd; /* Light border */
+    text-align: center;
+}
+
+.table-container thead {
+    background-color: #f3f4f6; /* Light gray background */
+    position: sticky;
+    top: 0;
+    z-index: 10; /* Keeps the header visible */
+}
